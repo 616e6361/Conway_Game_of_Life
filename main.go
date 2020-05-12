@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
-	//"image/color"
 	"github.com/hajimehoshi/ebiten"
 	"github.com/hajimehoshi/ebiten/ebitenutil"
 )
@@ -40,8 +39,7 @@ var (
 	cells               = make([]byte, screenWidth*screenHeight*4)
 	yellowColor         = []byte{0xff, 0xff, 0, 0xff}
 	x, y        float64 = 0, 0
-	flag, f     int     = 0, 1
-	frames      int     = 0
+	flag, frames     int     = 0, 0
 )
 
 //
@@ -62,9 +60,6 @@ func firstCells() {
 			n--
 		} else {
 			cells_map[c].life = true
-			// Test print.
-			//
-			//fmt.Println(cells_map[c].x, " - ", cells_map[c].y, " - ", cells_map[c].life)
 		}
 	}
 }
@@ -131,6 +126,7 @@ func Update() {
 		//
 
 		k := 0
+		
 		// Going through y pos.
 		//
 		for y < screenHeight {
@@ -169,7 +165,7 @@ func Update() {
 			//
 			// x - width - 1	||	x - width	||	x - width + 1	/	y - 1
 			//
-			// x - 1			||		-		||	x + 1			/	y
+			// x - 1		||		-	||	x + 1		/	y
 			//
 			// x + width - 1	||	x + width	||	x + width + 1	/	y + 1
 			//
@@ -178,21 +174,9 @@ func Update() {
 			//
 			neighbors := countNeighbors(k)
 
-			// Test print.
-			//
-			if f == 0 {
-				//fmt.Println(v.x, " - ", v.y, " - ", v.life, " - ", neighbors)
-			}
-
 			// Handle dead and alive cells differently.
 			//
 			if v.life == true {
-				// Test print.
-				//
-				if f == 0 {
-					fmt.Println("OLD: ", v.x, " - ", v.y, " - ", v.life, " - ", neighbors)
-				}
-
 				// See if this cell should die.
 				//
 				if neighbors == 2 || neighbors == 3 {
@@ -226,10 +210,6 @@ func Update() {
 		// Now we assign all the results to the original cells_map array.
 		//
 		cells_map = tempCellsMap
-
-		// Used only for Test print.
-		//
-		f = 1
 	}
 }
 
