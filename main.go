@@ -14,32 +14,21 @@
 package main
 
 import (
-	"fmt"
 	"math/rand"
 	"time"
 	"github.com/hajimehoshi/ebiten"
 	"github.com/hajimehoshi/ebiten/ebitenutil"
 )
 
-type Info struct {
-	x, y float64
-	life bool
-}
-
 const (
-	screenWidth  = 1000
-	screenHeight = 500
+	screenWidth  = 2000
+	screenHeight = 1000
 	all_cells    = screenWidth * screenHeight
-	first_cells  = 1000 * 300 // You can decide the number of live cells to begin with.
 )
 
 var (
-	square      *ebiten.Image
-	cells_map   [all_cells]Info
-	cells               = make([]byte, screenWidth*screenHeight*4)
-	yellowColor         = []byte{0xff, 0xff, 0, 0xff}
-	x, y        float64 = 0, 0
-	flag, frames     int     = 0, 0
+	cells            = make([]byte, screenWidth*screenHeight*4)
+	flag, frames int = 0, 0
 )
 
 //
@@ -50,17 +39,16 @@ func firstCells() {
 	//
 	rand.Seed(time.Now().UnixNano())
 
-	for n := 0; n < first_cells; n++ {
-		// Generate rand cell number.
+	for k := 0; k < all_cells; k++ {
+		b := [2]byte{0, 0xff}
+		c := rand.Intn(1-0+1) + 0
+
+		// Assign each cell.
 		//
-		c := rand.Intn(screenWidth * screenHeight)
-		// Check if that number is repeating.
-		//
-		if cells_map[c].life == true {
-			n--
-		} else {
-			cells_map[c].life = true
-		}
+		cells[k*4] = b[c]
+		cells[k*4+1] = b[c]
+		cells[k*4+2] = b[c]
+		cells[k*4+3] = b[c]
 	}
 }
 
@@ -86,12 +74,12 @@ func countNeighbors(key int) int {
 			if nkey >= 0 && nkey < all_cells {
 				// Check if neighbor is outside the window  limits.
 				//
-				tx := cells_map[nkey].x
-				ty := cells_map[nkey].y
+				ty := nkey / screenWidth
+				tx := nkey - (ty * screenWidth)
 				if tx >= 0 && tx < screenWidth && ty >= 0 && ty < screenHeight {
 					// If neighbor cell is alive, then incremend total.
 					//
-					if cells_map[nkey].life == true {
+					if cells[nkey*4] == 0xff {
 						total++
 					}
 				}
@@ -103,7 +91,7 @@ func countNeighbors(key int) int {
 	// We also counted the current live cell.
 	// If it's alive, we'll decrement that from the equation.
 	//
-	if cells_map[key].life == true {
+	if cells[key*4] == 0xff {
 		total--
 	}
 
@@ -111,40 +99,11 @@ func countNeighbors(key int) int {
 }
 
 //
-// RECALCULATE CELLS FOR THE NEXT GENERATION
+// UPDATE AND DRAW CELLS
 //
-func Update() {
+func Update(screen *ebiten.Image) {
 	switch flag {
 	case 0:
-		//
-		// DEFAULT CELLS AND FIRST LIVE CELLS
-		//
-		// Define each cell inside the map.
-		// (Well, it's not a map, but an ARRAY really. But I call it a map 'cause I'm mapping the cells. Not very logical.)
-		// First set x, y pos, with life.bool = false as a default.
-		// Then create the first random live cells.
-		//
-
-		k := 0
-		
-		// Going through y pos.
-		//
-		for y < screenHeight {
-			// Going through x pos.
-			//
-			for x < screenWidth {
-				// Set cell as default dead.
-				//
-				cells_map[k] = Info{x, y, false}
-				x++
-				k++
-			}
-			x = 0
-			y++
-		}
-
-		// Creating the first, random live cells.
-		//
 		firstCells()
 
 		// Set flag to 1, so we don't repeat this process.
@@ -152,43 +111,28 @@ func Update() {
 		flag = 1
 
 	case 1:
-		//
-		// CHECK FOR LIVE CELLS NEIGHBOURS
-		//
-		// We make a temp cells_map, so we can update the whole cells_map array at the end.
-		// If we directly change the cells_map array, then the final result will be affected in the process -
-		// - the detection of neighbors will be faulty.
-		//
-		var tempCellsMap [all_cells]Info = cells_map
-
-		for k, v := range cells_map {
-			//
-			// x - width - 1	||	x - width	||	x - width + 1	/	y - 1
-			//
-			// x - 1		||		-	||	x + 1		/	y
-			//
-			// x + width - 1	||	x + width	||	x + width + 1	/	y + 1
-			//
-
+		var tempCells = make([]byte, screenWidth*screenHeight*4)
+		
+		for k := 0; k < all_cells; k++ {
 			// Get number of neighbors.
 			//
 			neighbors := countNeighbors(k)
 
 			// Handle dead and alive cells differently.
 			//
-			if v.life == true {
+			if cells[k*4] == 0xff {
 				// See if this cell should die.
 				//
 				if neighbors == 2 || neighbors == 3 {
 					// Extant.
-					// Do nothing.
 					//
+					tempCells[k*4] = cells[k*4]
+					tempCells[k*4+1] = cells[k*4+1]
+					tempCells[k*4+2] = cells[k*4+2]
+					tempCells[k*4+3] = cells[k*4+3]
 				} else {
-					// Exctinct.
+					// Exctinct. Do nothing.
 					//
-					// We change the temp cells_map, not the original one.
-					//
-					tempCellsMap[k].life = false
 				}
 			} else {
 				// See if this empty cell should come alive.
@@ -196,83 +140,35 @@ func Update() {
 				if neighbors == 3 {
 					// Birth.
 					//
-					// We change the temp cells_map, not the original one.
-					//
-					tempCellsMap[k].life = true
+					tempCells[k*4] = 0xff
+					tempCells[k*4+1] = 0xff
+					tempCells[k*4+2] = 0xff
+					tempCells[k*4+3] = 0xff
 				} else {
-					// Stay unborn.
-					// Do nothing.
+					// Stay unborn. Do nothing.
 					//
 				}
 			}
 		}
 
-		// Now we assign all the results to the original cells_map array.
+		// Now we assign all the results to the original cells array.
 		//
-		cells_map = tempCellsMap
-	}
-}
-
-//
-// CHANGE PIXELS COLOR IN THE BYTE ARRAY / DRAW
-//
-func Draw(screen *ebiten.Image) {
-	// Go through the cells map.
-	//
-	for k, v := range cells_map {
-		if v.life == true {
-			// Find cell position in the pixel matrix.
-			//
-			idx := 4 * k
-			// Set color.
-			//
-			cells[idx] = yellowColor[0]
-			cells[idx+1] = yellowColor[1]
-			cells[idx+2] = yellowColor[2]
-			cells[idx+3] = yellowColor[3]
-		} else {
-			idx := 4 * k
-			// Set transparent color / remove pixel.
-			//
-			cells[idx] = 0
-			cells[idx+1] = 0
-			cells[idx+2] = 0
-			cells[idx+3] = 0
-		}
+		cells = tempCells
 	}
 }
 
 // Default 60 FPS
 //
 func update(screen *ebiten.Image) error {
-	// Update our cells map.
-	//
-	Update()
-
 	// Update our pixel matrix.
 	//
-	Draw(screen)
+	Update(screen)
 
-	// Clear screen / Replace with the new generation cells.
+	// Clear screen / New generation.
 	//
 	screen.ReplacePixels(cells)
 
-	// Timer.
-	//
-	time.Sleep(5 * time.Millisecond)
-
-	//
-	// INTRO
-	//
-	// We have it here, below the Game functions,
-	// because it needs to be printed on top of the cells.
-	//
 	ebitenutil.DebugPrint(screen, "Game of Life")
-
-	// If we want to count frames / generations.
-	//
-	frames++
-
 	return nil
 }
 
@@ -280,7 +176,7 @@ func main() {
 	//
 	// RUN THE GAME
 	//
-	if err := ebiten.Run(update, screenWidth, screenHeight, 3, "Hello world!"); err != nil {
+	if err := ebiten.Run(update, screenWidth, screenHeight, 1, "Hello world!"); err != nil {
 		panic(err)
 	}
 }
